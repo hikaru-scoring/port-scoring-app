@@ -88,6 +88,34 @@ def score_color(score):
         return "#ef4444"  # red
 
 
+def render_score_delta(asset_name: str, current_total: int):
+    history = _load_scores_history()
+    if not history:
+        return
+    dates = sorted(history.keys(), reverse=True)
+    prev_score = None
+    for d in dates:
+        s = history[d].get(asset_name)
+        if s is not None:
+            prev_score = s
+            break
+    if prev_score is None:
+        return
+    delta = current_total - prev_score
+    if delta > 0:
+        color, arrow = "#10b981", "&#9650;"
+    elif delta < 0:
+        color, arrow = "#ef4444", "&#9660;"
+    else:
+        color, arrow = "#94a3b8", "&#9644;"
+    st.markdown(
+        f'<div style="text-align:center; font-size:1.1em; font-weight:700; color:{color}; margin-top:-8px; margin-bottom:10px;">'
+        f'{arrow} {delta:+d} from last record ({prev_score})'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Header
 # ---------------------------------------------------------------------------
@@ -199,17 +227,21 @@ if selected_display:
         st.markdown(f"""
         <div style="text-align:center; margin-top:4px; margin-bottom:10px;">
             <div style="font-size:14px; letter-spacing:2px; color:#666;">TOTAL SCORE</div>
-            <div style="font-size:90px; font-weight:800; color:{sc}; line-height:1;">
+            <div style="font-size:90px; font-weight:800; color:#2E7BE6; line-height:1;">
                 {total}
                 <span style="font-size:35px; color:#BBB;">/ 1000</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
+        # Score delta from last record
+        render_score_delta(selected_name, total)
+
         # Layout: Radar Chart (left) + Score Cards (right)
         col_left, col_right = st.columns([1.5, 1])
 
         with col_left:
+            st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
             # Radar chart
             labels = AXES_LABELS
             values = [axes.get(a, 0) for a in labels]
@@ -221,8 +253,8 @@ if selected_display:
                 r=values_closed,
                 theta=labels_closed,
                 fill='toself',
-                fillcolor='rgba(0, 119, 182, 0.1)',
-                line_color=PRIMARY_COLOR,
+                fillcolor='rgba(46, 123, 230, 0.1)',
+                line_color='#2E7BE6',
                 line=dict(width=4),
                 name=selected_name,
             ))
@@ -241,6 +273,7 @@ if selected_display:
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
         with col_right:
+            st.markdown("<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>II. ANALYSIS SCORE METRICS</div>", unsafe_allow_html=True)
             # Individual axis score cards
             for ax_name in AXES_LABELS:
                 ax_val = axes.get(ax_name, 0)
@@ -252,13 +285,13 @@ if selected_display:
                     border-radius: 12px;
                     margin-bottom: 12px;
                     border: 1px solid #E0E0E0;
-                    border-left: 8px solid {PRIMARY_COLOR};
+                    border-left: 8px solid #2E7BE6;
                     box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
                 ">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                         <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{ax_name}</span>
                         <span style="font-size: 1.9em; font-weight: 900; line-height: 1;">
-                            <span style="color: {PRIMARY_COLOR};">{ax_val}</span>
+                            <span style="color: #2E7BE6;">{ax_val}</span>
                             <span style="color:#bbb;font-size:0.5em;font-weight:600;"> /200</span>
                         </span>
                     </div>
@@ -304,10 +337,10 @@ if history:
                 x=hist_dates,
                 y=hist_values,
                 mode='lines+markers',
-                line=dict(color=PRIMARY_COLOR, width=2),
+                line=dict(color='#2E7BE6', width=2),
                 marker=dict(size=5),
                 fill='tozeroy',
-                fillcolor='rgba(0, 119, 182, 0.05)',
+                fillcolor='rgba(46,123,230,0.05)',
                 name=hist_port,
             ))
             fig_daily.update_layout(
