@@ -14,19 +14,52 @@ from data_logic import (
     get_raw_data,
 )
 
+APP_TITLE = "PORT-1000"
+PRIMARY_COLOR = "#0077B6"
+SCORES_HISTORY_FILE = os.path.join(os.path.dirname(__file__), "scores_history.json")
+
+AXES_DESCRIPTIONS = {
+    "Throughput Power": "Annual TEU volume and cargo tonnage. Higher throughput = higher score.",
+    "Operational Efficiency": "Vessel turnaround time, crane productivity, dwell time. Faster operations = higher score.",
+    "Connectivity": "Number of shipping routes, transshipment ratio, liner connectivity index. More connected = higher score.",
+    "Infrastructure": "Berth length, max draft, number of berths, equipment. Better facilities = higher score.",
+    "Geopolitical Risk": "Political stability, trade openness, logistics performance. Lower risk = higher score (inverse scoring).",
+}
+
 st.set_page_config(
     page_title="PORT-1000: Global Port Scoring",
     page_icon="\u2693",
     layout="wide",
 )
 
-SCORES_HISTORY_FILE = os.path.join(os.path.dirname(__file__), "scores_history.json")
+# ---------------------------------------------------------------------------
+# CSS Injection (hide Streamlit chrome)
+# ---------------------------------------------------------------------------
+st.markdown("""
+<style>
+.block-container { padding-top: 1rem !important; }
+header[data-testid="stHeader"] { display: none !important; }
+footer { display: none !important; }
+#MainMenu { display: none !important; }
+.viewerBadge_container__r5tak { display: none !important; }
+.styles_viewerBadge__CvC9N { display: none !important; }
+[data-testid="stActionButtonIcon"] { display: none !important; }
+[data-testid="manage-app-button"] { display: none !important; }
+a[href*="github.com"] img { display: none !important; }
+div[class*="viewerBadge"] { display: none !important; }
+div[class*="StatusWidget"] { display: none !important; }
+div[data-testid="stStatusWidget"] { display: none !important; }
+.stDeployButton { display: none !important; }
+div[class*="stToolbar"] { display: none !important; }
+div.embeddedAppMetaInfoBar_container__DxxL1 { display: none !important; }
+div[class*="embeddedAppMetaInfoBar"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
 def _load_scores_history():
     if os.path.exists(SCORES_HISTORY_FILE):
         with open(SCORES_HISTORY_FILE, "r") as f:
@@ -34,8 +67,8 @@ def _load_scores_history():
     return {}
 
 
-def _score_to_color(score, max_score=1000):
-    """Map score to RGB color. Green = high, Red = low."""
+def _score_to_color_rgba(score, max_score=1000):
+    """Map score to RGBA list for pydeck. Green = high, Red = low."""
     ratio = max(0.0, min(1.0, score / max_score))
     r = int(220 * (1 - ratio))
     g = int(200 * ratio)
@@ -43,104 +76,39 @@ def _score_to_color(score, max_score=1000):
     return [r, g, b, 180]
 
 
-def _score_to_hex(score, max_score=1000):
-    c = _score_to_color(score, max_score)
-    return "#{:02x}{:02x}{:02x}".format(c[0], c[1], c[2])
+def score_color(score):
+    """Return a hex color based on score thresholds."""
+    if score >= 800:
+        return "#10b981"  # green
+    elif score >= 600:
+        return "#2E7BE6"  # blue
+    elif score >= 400:
+        return "#f59e0b"  # amber
+    else:
+        return "#ef4444"  # red
 
 
 # ---------------------------------------------------------------------------
-# CSS
+# Header
 # ---------------------------------------------------------------------------
-st.markdown("""
-<style>
-    .main-title {
-        font-size: 2.4em;
-        font-weight: 800;
-        color: #0077B6;
-        margin-bottom: 0;
-    }
-    .sub-title {
-        font-size: 1.1em;
-        color: #64748B;
-        margin-top: -8px;
-        margin-bottom: 20px;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #F0F8FF 0%, #E0F0FF 100%);
-        border-radius: 12px;
-        padding: 18px;
-        text-align: center;
-        border: 1px solid #B8D8F8;
-    }
-    .metric-card h3 {
-        margin: 0;
-        color: #0077B6;
-        font-size: 1.8em;
-    }
-    .metric-card p {
-        margin: 4px 0 0 0;
-        color: #64748B;
-        font-size: 0.9em;
-    }
-    .score-badge {
-        display: inline-block;
-        padding: 2px 10px;
-        border-radius: 8px;
-        color: white;
-        font-weight: 700;
-        font-size: 0.95em;
-    }
-</style>
+st.markdown(f"""
+<div style="text-align:center; margin-bottom:10px;">
+    <div style="font-size:38px; font-weight:900; color:{PRIMARY_COLOR};">\u2693 PORT-1000</div>
+    <div style="font-size:16px; color:#64748B; margin-top:-4px;">Global Port Scoring</div>
+    <div style="font-size:13px; color:#999; margin-top:2px;">Scoring 50+ major ports worldwide on Throughput, Efficiency, Connectivity, Infrastructure, and Geopolitical Risk.</div>
+</div>
 """, unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# Main Page
-# ---------------------------------------------------------------------------
-st.markdown('<div class="main-title">\u2693 PORT-1000: Global Port Scoring</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="sub-title">'
-    "Scoring 50+ major ports worldwide on Throughput, Efficiency, "
-    "Connectivity, Infrastructure, and Geopolitical Risk. "
-    "Country-level data from World Bank API. Port-level data curated from "
-    "UNCTAD, port authority reports, and Lloyd's List."
-    "</div>",
-    unsafe_allow_html=True,
-)
 
 rankings = get_port_rankings()
 
-# Summary stats
-total_ports = len(rankings)
-avg_score = int(sum(p["total"] for p in rankings) / total_ports) if total_ports else 0
-top_port = rankings[0] if rankings else {}
-bottom_port = rankings[-1] if rankings else {}
+if not rankings:
+    st.error("No data available.")
+    st.stop()
 
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.markdown(f'<div class="metric-card"><h3>{total_ports}</h3><p>Ports Scored</p></div>', unsafe_allow_html=True)
-with col2:
-    st.markdown(f'<div class="metric-card"><h3>{avg_score}</h3><p>Average Score /1000</p></div>', unsafe_allow_html=True)
-with col3:
-    st.markdown(
-        f'<div class="metric-card"><h3>{top_port.get("flag", "")} {top_port.get("name", "")}</h3>'
-        f'<p>Top Port ({top_port.get("total", 0)}/1000)</p></div>',
-        unsafe_allow_html=True,
-    )
-with col4:
-    st.markdown(
-        f'<div class="metric-card"><h3>{bottom_port.get("flag", "")} {bottom_port.get("name", "")}</h3>'
-        f'<p>Bottom Port ({bottom_port.get("total", 0)}/1000)</p></div>',
-        unsafe_allow_html=True,
-    )
-
-st.markdown("---")
 
 # ---------------------------------------------------------------------------
-# World Map (pydeck)
+# World Map (pydeck) - unique to PORT-1000
 # ---------------------------------------------------------------------------
-st.subheader("World Port Map")
-
 map_data = []
 for p in rankings:
     map_data.append({
@@ -149,7 +117,7 @@ for p in rankings:
         "lat": p["lat"],
         "lng": p["lng"],
         "total": p["total"],
-        "color": _score_to_color(p["total"]),
+        "color": _score_to_color_rgba(p["total"]),
         "radius": max(30000, p["total"] * 80),
     })
 
@@ -178,7 +146,7 @@ view_state = pdk.ViewState(
 tooltip = {
     "html": "<b>{name}</b> ({country})<br/>Score: {total}/1000",
     "style": {
-        "backgroundColor": "#0077B6",
+        "backgroundColor": PRIMARY_COLOR,
         "color": "white",
         "fontSize": "13px",
         "padding": "8px",
@@ -195,14 +163,174 @@ deck = pdk.Deck(
 
 st.pydeck_chart(deck, use_container_width=True)
 
-st.caption("Circle size and color reflect the port score. Green = high score, Red = low score.")
 
+# ---------------------------------------------------------------------------
+# Detail View
+# ---------------------------------------------------------------------------
 st.markdown("---")
+port_names = [f'{p["flag"]} {p["name"]}' for p in rankings]
+selected_display = st.selectbox("Select a port to view details", port_names)
+
+if selected_display:
+    selected_name = selected_display.split(" ", 1)[1] if " " in selected_display else selected_display
+    detail = get_port_detail(selected_name)
+    raw = get_raw_data(selected_name)
+
+    if detail and raw:
+        total = detail["total"]
+        axes = detail["axes"]
+        sc = score_color(total)
+
+        # Find rank
+        rank_num = "?"
+        total_ports = len(rankings)
+        for r in rankings:
+            if r["name"] == selected_name:
+                rank_num = r["rank"]
+                break
+
+        st.markdown(f"""
+        <div style="text-align:center; margin-bottom:4px;">
+            <div style="font-size:22px; font-weight:700; color:#333;">{detail['flag']} {detail['name']} <span style="font-size:16px; color:#999;">({detail['country']}) Rank #{rank_num} of {total_ports}</span></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Total score centered
+        st.markdown(f"""
+        <div style="text-align:center; margin-top:4px; margin-bottom:10px;">
+            <div style="font-size:14px; letter-spacing:2px; color:#666;">TOTAL SCORE</div>
+            <div style="font-size:90px; font-weight:800; color:{sc}; line-height:1;">
+                {total}
+                <span style="font-size:35px; color:#BBB;">/ 1000</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Layout: Radar Chart (left) + Score Cards (right)
+        col_left, col_right = st.columns([1.5, 1])
+
+        with col_left:
+            # Radar chart
+            labels = AXES_LABELS
+            values = [axes.get(a, 0) for a in labels]
+            values_closed = values + [values[0]]
+            labels_closed = labels + [labels[0]]
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(
+                r=values_closed,
+                theta=labels_closed,
+                fill='toself',
+                fillcolor='rgba(0, 119, 182, 0.1)',
+                line_color=PRIMARY_COLOR,
+                line=dict(width=4),
+                name=selected_name,
+            ))
+            fig.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[0, 200], gridcolor="#F0F0F0"),
+                    angularaxis=dict(rotation=90, direction="clockwise"),
+                    bgcolor='white',
+                ),
+                showlegend=False,
+                margin=dict(l=50, r=50, t=20, b=20),
+                height=500,
+                clickmode='none',
+                dragmode=False,
+            )
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+        with col_right:
+            # Individual axis score cards
+            for ax_name in AXES_LABELS:
+                ax_val = axes.get(ax_name, 0)
+                desc = AXES_DESCRIPTIONS.get(ax_name, "")
+                st.markdown(f"""
+                <div style="
+                    background-color: #FFFFFF;
+                    padding: 20px;
+                    border-radius: 12px;
+                    margin-bottom: 12px;
+                    border: 1px solid #E0E0E0;
+                    border-left: 8px solid {PRIMARY_COLOR};
+                    box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{ax_name}</span>
+                        <span style="font-size: 1.9em; font-weight: 900; line-height: 1;">
+                            <span style="color: {PRIMARY_COLOR};">{ax_val}</span>
+                            <span style="color:#bbb;font-size:0.5em;font-weight:600;"> /200</span>
+                        </span>
+                    </div>
+                    <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Key Metrics
+        st.markdown("#### Key Metrics")
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.metric("Annual TEU (2023)", f'{raw.get("teu_million", "N/A")}M')
+            st.metric("TEU Growth YoY", f'{raw.get("teu_growth_pct", "N/A")}%')
+        with m2:
+            st.metric("Cargo Volume", f'{raw.get("cargo_mt", "N/A")} MT')
+            st.metric("Max Draft", f'{raw.get("max_draft_m", "N/A")} m')
+        with m3:
+            st.metric("Berth Length", f'{raw.get("berth_length_m", "N/A")} m')
+            st.metric("Number of Berths", raw.get("num_berths", "N/A"))
+
+
+# ---------------------------------------------------------------------------
+# Score History
+# ---------------------------------------------------------------------------
+history = _load_scores_history()
+if history:
+    st.markdown("---")
+    st.markdown("#### Score History")
+
+    dates = sorted(history.keys())
+    if dates:
+        hist_port = st.selectbox("Select port for history", [p["name"] for p in rankings], key="hist_port")
+        hist_values = []
+        hist_dates = []
+        for d in dates:
+            val = history[d].get(hist_port)
+            if val is not None:
+                hist_dates.append(d)
+                hist_values.append(val)
+        if hist_values:
+            fig_daily = go.Figure()
+            fig_daily.add_trace(go.Scatter(
+                x=hist_dates,
+                y=hist_values,
+                mode='lines+markers',
+                line=dict(color=PRIMARY_COLOR, width=2),
+                marker=dict(size=5),
+                fill='tozeroy',
+                fillcolor='rgba(0, 119, 182, 0.05)',
+                name=hist_port,
+            ))
+            fig_daily.update_layout(
+                yaxis=dict(range=[0, 1000], title="Score"),
+                height=250,
+                margin=dict(l=0, r=0, t=10, b=0),
+                plot_bgcolor='white',
+                hovermode="x unified",
+                clickmode='none',
+                dragmode=False,
+            )
+            st.plotly_chart(fig_daily, use_container_width=True, config={"displayModeBar": False})
+        else:
+            st.caption("No history recorded for this port yet.")
+else:
+    st.caption("No daily score records yet. Records will appear after the GitHub Actions workflow runs.")
+
 
 # ---------------------------------------------------------------------------
 # Ranking Table
 # ---------------------------------------------------------------------------
-st.subheader("Full Ranking Table")
+st.markdown("---")
+st.markdown("#### Full Rankings")
 
 table_rows = []
 for p in rankings:
@@ -221,175 +349,18 @@ st.dataframe(
     df_table,
     use_container_width=True,
     hide_index=True,
-    height=600,
+    height=450,
 )
 
-st.markdown("---")
-
-# Top 10 / Bottom 10
-col_top, col_bot = st.columns(2)
-
-with col_top:
-    st.subheader("Top 10 Ports")
-    for p in rankings[:10]:
-        color = _score_to_hex(p["total"])
-        st.markdown(
-            f'**#{p["rank"]}** {p["flag"]} **{p["name"]}** ({p["country"]}) '
-            f'<span class="score-badge" style="background:{color};">{p["total"]}/1000</span>',
-            unsafe_allow_html=True,
-        )
-
-with col_bot:
-    st.subheader("Bottom 10 Ports")
-    for p in rankings[-10:]:
-        color = _score_to_hex(p["total"])
-        st.markdown(
-            f'**#{p["rank"]}** {p["flag"]} **{p["name"]}** ({p["country"]}) '
-            f'<span class="score-badge" style="background:{color};">{p["total"]}/1000</span>',
-            unsafe_allow_html=True,
-        )
-
-st.markdown("---")
 
 # ---------------------------------------------------------------------------
-# Detail View
+# Methodology
 # ---------------------------------------------------------------------------
-st.subheader("Port Detail View")
-
-port_names = [f'{p["flag"]} {p["name"]}' for p in rankings]
-selected_display = st.selectbox("Select a port", port_names)
-
-# Extract actual port name from display string (remove flag emoji)
-if selected_display:
-    selected_name = selected_display.split(" ", 1)[1] if " " in selected_display else selected_display
-    detail = get_port_detail(selected_name)
-    raw = get_raw_data(selected_name)
-
-    if detail and raw:
-        st.markdown(f"### {detail['flag']} {detail['name']} ({detail['country']})")
-        st.markdown(f"**Total Score: {detail['total']} / 1000** (Rank #{detail.get('rank', '?')})")
-
-        # Find rank from rankings
-        for r in rankings:
-            if r["name"] == selected_name:
-                st.markdown(f"**Rank: #{r['rank']} of {total_ports}**")
-                break
-
-        col_radar, col_bar = st.columns(2)
-
-        # Radar chart
-        with col_radar:
-            st.markdown("#### Score Radar")
-            categories = AXES_LABELS + [AXES_LABELS[0]]  # close the polygon
-            values = [detail["axes"].get(a, 0) for a in AXES_LABELS]
-            values_closed = values + [values[0]]
-
-            fig_radar = go.Figure()
-            fig_radar.add_trace(go.Scatterpolar(
-                r=values_closed,
-                theta=categories,
-                fill='toself',
-                fillcolor='rgba(0, 119, 182, 0.2)',
-                line=dict(color='#0077B6', width=2),
-                name=selected_name,
-            ))
-            fig_radar.update_layout(
-                polar=dict(
-                    radialaxis=dict(visible=True, range=[0, 200]),
-                ),
-                showlegend=False,
-                margin=dict(l=60, r=60, t=30, b=30),
-                height=380,
-            )
-            st.plotly_chart(fig_radar, use_container_width=True)
-
-        # Bar chart
-        with col_bar:
-            st.markdown("#### Score Breakdown")
-            fig_bar = go.Figure()
-            colors = ['#0077B6', '#00A6D6', '#48CAE4', '#90E0EF', '#ADE8F4']
-            for i, axis in enumerate(AXES_LABELS):
-                fig_bar.add_trace(go.Bar(
-                    x=[axis],
-                    y=[detail["axes"].get(axis, 0)],
-                    name=axis,
-                    marker_color=colors[i % len(colors)],
-                    text=[f'{detail["axes"].get(axis, 0)}/200'],
-                    textposition='outside',
-                ))
-            fig_bar.update_layout(
-                yaxis=dict(range=[0, 220], title="Score /200"),
-                showlegend=False,
-                margin=dict(l=40, r=20, t=30, b=80),
-                height=380,
-            )
-            st.plotly_chart(fig_bar, use_container_width=True)
-
-        # Key Metrics
-        st.markdown("#### Key Metrics")
-        m1, m2, m3 = st.columns(3)
-        with m1:
-            st.metric("Annual TEU (2023)", f'{raw.get("teu_million", "N/A")}M')
-            st.metric("TEU Growth YoY", f'{raw.get("teu_growth_pct", "N/A")}%')
-        with m2:
-            st.metric("Cargo Volume", f'{raw.get("cargo_mt", "N/A")} MT')
-            st.metric("Max Draft", f'{raw.get("max_draft_m", "N/A")} m')
-        with m3:
-            st.metric("Berth Length", f'{raw.get("berth_length_m", "N/A")} m')
-            st.metric("Number of Berths", raw.get("num_berths", "N/A"))
-
-        # Data source
-        st.markdown("#### Data Source")
-        st.info(f'Port-level data source: {raw.get("source", "N/A")}. '
-                f'Country-level indicators from World Bank Open Data API '
-                f'(Political Stability PV.EST, Logistics Performance Index LP.LPI.*, '
-                f'Trade Openness TG.VAL.TOTL.GD.ZS).')
-
-
-# ---------------------------------------------------------------------------
-# Score History
-# ---------------------------------------------------------------------------
-st.markdown("---")
-st.subheader("Score History")
-
-history = _load_scores_history()
-if history:
-    dates = sorted(history.keys())
-    if dates:
-        # Let user pick a port to see history
-        hist_port = st.selectbox("Select port for history", [p["name"] for p in rankings], key="hist_port")
-        hist_values = []
-        hist_dates = []
-        for d in dates:
-            val = history[d].get(hist_port)
-            if val is not None:
-                hist_dates.append(d)
-                hist_values.append(val)
-        if hist_values:
-            fig_hist = go.Figure()
-            fig_hist.add_trace(go.Scatter(
-                x=hist_dates,
-                y=hist_values,
-                mode="lines+markers",
-                line=dict(color="#0077B6", width=2),
-                marker=dict(size=6),
-                name=hist_port,
-            ))
-            fig_hist.update_layout(
-                yaxis=dict(range=[0, 1000], title="Score /1000"),
-                xaxis=dict(title="Date"),
-                margin=dict(l=40, r=20, t=30, b=40),
-                height=350,
-            )
-            st.plotly_chart(fig_hist, use_container_width=True)
-        else:
-            st.caption("No history recorded for this port yet.")
-else:
-    st.caption("No daily score records yet. Records will appear after the GitHub Actions workflow runs.")
-
-st.markdown("---")
-st.caption(
-    "PORT-1000 v2.0. Port-level data curated from UNCTAD, port authority annual reports, "
-    "and Lloyd's List (2023). Country-level data from World Bank Open Data API. "
-    "Scores update daily via automated recording."
-)
+with st.expander("Scoring Methodology"):
+    st.markdown("### PORT-1000 Scoring System")
+    st.markdown("Each port is scored on 5 axes, each worth 0-200 points, for a maximum total of 1,000.")
+    st.markdown("")
+    for ax, desc in AXES_DESCRIPTIONS.items():
+        st.markdown(f"**{ax}** (0-200): {desc}")
+    st.markdown("")
+    st.markdown("Port-level data curated from UNCTAD, port authority annual reports, and Lloyd's List (2023). Country-level data from World Bank Open Data API.")
