@@ -403,18 +403,30 @@ with tab_detail:
                     </div>
                     """, unsafe_allow_html=True)
 
-            # Key Metrics
-            st.markdown("#### Key Metrics")
-            m1, m2, m3 = st.columns(3)
-            with m1:
-                st.metric("Annual TEU (2023)", f'{raw.get("teu_million", "N/A")}M')
-                st.metric("TEU Growth YoY", f'{raw.get("teu_growth_pct", "N/A")}%')
-            with m2:
-                st.metric("Cargo Volume", f'{raw.get("cargo_mt", "N/A")} MT')
-                st.metric("Max Draft", f'{raw.get("max_draft_m", "N/A")} m')
-            with m3:
-                st.metric("Berth Length", f'{raw.get("berth_length_m", "N/A")} m')
-                st.metric("Number of Berths", raw.get("num_berths", "N/A"))
+            # Key Metrics (snapshot style)
+            st.markdown(
+                "<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: 10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>III. KEY METRICS SNAPSHOT</div>",
+                unsafe_allow_html=True,
+            )
+
+            snapshot_items = [
+                ("Annual TEU (2023)", f'{raw.get("teu_million", "N/A")}M'),
+                ("TEU Growth YoY", f'{raw.get("teu_growth_pct", "N/A")}%'),
+                ("Cargo Volume", f'{raw.get("cargo_mt", "N/A")} MT'),
+                ("Max Draft", f'{raw.get("max_draft_m", "N/A")} m'),
+                ("Berth Length", f'{raw.get("berth_length_m", "N/A"):,} m' if raw.get("berth_length_m") else "N/A"),
+                ("Number of Berths", str(raw.get("num_berths", "N/A"))),
+            ]
+
+            snap_cols = st.columns(3)
+            for idx, (label, val) in enumerate(snapshot_items):
+                with snap_cols[idx % 3]:
+                    st.markdown(f"""
+                    <div style="background:#f8fafc; border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0;">
+                        <div style="font-size:0.75em; color:#64748b; font-weight:600;">{label}</div>
+                        <div style="font-size:1.5em; font-weight:900; color:#1e293b; line-height:1.2;">{val}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             # Score History
             history_data = _load_scores_history()
