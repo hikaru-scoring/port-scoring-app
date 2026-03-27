@@ -3,7 +3,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import pydeck as pdk
 import json
 import os
 
@@ -25,6 +24,22 @@ AXES_DESCRIPTIONS = {
     "Connectivity": "Number of shipping routes, transshipment ratio, liner connectivity index. More connected = higher score.",
     "Infrastructure": "Berth length, max draft, number of berths, equipment. Better facilities = higher score.",
     "Geopolitical Risk": "Political stability, trade openness, logistics performance. Lower risk = higher score (inverse scoring).",
+}
+
+SHORT_DESCRIPTIONS = {
+    "Throughput Power": "TEU volume, cargo tonnage, growth rate",
+    "Operational Efficiency": "Logistics performance, customs efficiency",
+    "Connectivity": "Trade openness, tracking capability",
+    "Infrastructure": "Berth length, draft, berths, infra quality",
+    "Geopolitical Risk": "Political stability index (inverse)",
+}
+
+WHY_EXPLANATIONS = {
+    "Throughput Power": "Based on annual TEU volume, cargo tonnage, and year-over-year growth.",
+    "Operational Efficiency": "Based on country-level logistics performance and customs efficiency (World Bank LPI).",
+    "Connectivity": "Based on trade openness and tracking capability (World Bank indicators).",
+    "Infrastructure": "Based on berth length, max draft, number of berths, and infrastructure quality index.",
+    "Geopolitical Risk": "Based on political stability index (World Bank WGI). Higher stability = higher score.",
 }
 
 st.set_page_config(
@@ -68,15 +83,6 @@ def _load_scores_history():
         with open(SCORES_HISTORY_FILE, "r") as f:
             return json.load(f)
     return {}
-
-
-def _score_to_color_rgba(score, max_score=1000):
-    """Map score to RGBA list for pydeck. Green = high, Red = low."""
-    ratio = max(0.0, min(1.0, score / max_score))
-    r = int(220 * (1 - ratio))
-    g = int(200 * ratio)
-    b = 60
-    return [r, g, b, 180]
 
 
 def score_color(score):
@@ -260,70 +266,65 @@ with tab_dash:
                 unsafe_allow_html=True,
             )
 
-    # World Map (pydeck)
-    st.markdown("<div class='section-title'>World Map</div>", unsafe_allow_html=True)
-
-    map_data = []
-    for p in rankings:
-        map_data.append({
-            "name": p["name"],
-            "country": p["country"],
-            "lat": p["lat"],
-            "lng": p["lng"],
-            "total": p["total"],
-            "color": _score_to_color_rgba(p["total"]),
-            "radius": max(30000, p["total"] * 80),
-        })
-
-    map_df = pd.DataFrame(map_data)
-
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        data=map_df,
-        get_position='[lng, lat]',
-        get_radius='radius',
-        get_fill_color='color',
-        pickable=True,
-        opacity=0.7,
-        stroked=True,
-        get_line_color=[50, 50, 50, 100],
-        line_width_min_pixels=1,
-    )
-
-    view_state = pdk.ViewState(
-        latitude=20,
-        longitude=30,
-        zoom=1.5,
-        pitch=0,
-    )
-
-    tooltip = {
-        "html": "<b>{name}</b> ({country})<br/>Score: {total}/1000",
-        "style": {
-            "backgroundColor": PRIMARY_COLOR,
-            "color": "white",
-            "fontSize": "13px",
-            "padding": "8px",
-            "borderRadius": "6px",
-        },
-    }
-
-    deck = pdk.Deck(
-        layers=[layer],
-        initial_view_state=view_state,
-        tooltip=tooltip,
-        map_style="mapbox://styles/mapbox/light-v11",
-    )
-
-    st.pydeck_chart(deck, use_container_width=True)
 
 
 # ===================================================================
 # PORT DETAIL TAB
 # ===================================================================
 with tab_detail:
+    # World Map (Scattergeo) at top of Port Detail
+    all_scores_map = sorted(rankings, key=lambda x: x["total"], reverse=True)
+    min_score = min(p["total"] for p in rankings)
+    max_score = max(p["total"] for p in rankings)
+
+    fig_map = go.Figure()
+    fig_map.add_trace(go.Scattergeo(
+        lat=[p["lat"] for p in rankings],
+        lon=[p["lng"] for p in rankings],
+        text=[f'{p["flag"]} {p["name"]} ({p["country"]})\nScore: {p["total"]}' for p in rankings],
+        mode="markers+text",
+        marker=dict(
+            size=[max(8, p["total"] / 50) for p in rankings],
+            color=[p["total"] for p in rankings],
+            colorscale=[[0, "#d32f2f"], [0.5, "#ffd54f"], [1, "#2e7d32"]],
+            cmin=min_score, cmax=max_score,
+            colorbar=dict(title="Score", thickness=15, len=0.6),
+            line=dict(width=1, color="#333"),
+        ),
+        textfont=dict(size=8, color="#1e293b"),
+        textposition="top center",
+        hoverinfo="text",
+    ))
+    fig_map.update_layout(
+        geo=dict(
+            showland=True, landcolor="#f0f0f0",
+            showocean=True, oceancolor="#E8F4FD",
+            showcountries=True, countrycolor="#ccc",
+            showcoastlines=True, coastlinecolor="#999",
+            projection_type="natural earth",
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=500,
+        paper_bgcolor="white",
+        dragmode=False,
+    )
+    _map_event = st.plotly_chart(fig_map, use_container_width=True, config={
+        "displayModeBar": False, "scrollZoom": False, "doubleClick": False,
+    }, on_select="rerun", key="port_map_detail")
+
+    # Handle click to update selectbox
+    if _map_event:
+        try:
+            _points = _map_event.selection.points
+            if _points:
+                _idx = _points[0].get("pointIndex", None)
+                if _idx is not None and _idx < len(rankings):
+                    st.session_state["port_detail_select"] = f'{rankings[_idx]["flag"]} {rankings[_idx]["name"]}'
+        except Exception:
+            pass
+
     port_names = [f'{p["flag"]} {p["name"]}' for p in rankings]
-    selected_display = st.selectbox("Select a port to view details", port_names)
+    selected_display = st.selectbox("Select a port to view details", port_names, key="port_detail_select")
 
     if selected_display:
         selected_name = selected_display.split(" ", 1)[1] if " " in selected_display else selected_display
@@ -381,7 +382,7 @@ with tab_detail:
                 # Individual axis score cards
                 for ax_name in AXES_LABELS:
                     ax_val = axes.get(ax_name, 0)
-                    desc = AXES_DESCRIPTIONS.get(ax_name, "")
+                    desc = SHORT_DESCRIPTIONS.get(ax_name, "")
                     st.markdown(f"""
                     <div style="
                         background-color: #FFFFFF;
@@ -402,6 +403,8 @@ with tab_detail:
                         <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc}</p>
                     </div>
                     """, unsafe_allow_html=True)
+                    with st.expander(f"Why {int(ax_val)}?", expanded=False):
+                        st.markdown(WHY_EXPLANATIONS.get(ax_name, ""))
 
             # Key Metrics (snapshot style)
             st.markdown(
