@@ -13,6 +13,7 @@ from data_logic import (
     get_port_detail,
     get_raw_data,
 )
+from ui_components import inject_css, render_radar_chart
 
 APP_TITLE = "PORT-1000"
 PRIMARY_COLOR = "#0077B6"
@@ -33,8 +34,9 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------------------------
-# CSS Injection (hide Streamlit chrome)
+# CSS Injection (shared across all scoring apps)
 # ---------------------------------------------------------------------------
+inject_css()
 st.markdown("""
 <style>
 .block-container { padding-top: 1rem !important; }
@@ -49,6 +51,7 @@ a[href*="github.com"] img { display: none !important; }
 div[class*="viewerBadge"] { display: none !important; }
 div[class*="StatusWidget"] { display: none !important; }
 div[data-testid="stStatusWidget"] { display: none !important; }
+iframe[title="streamlit_lottie.streamlit_lottie"] { display: none !important; }
 .stDeployButton { display: none !important; }
 div[class*="stToolbar"] { display: none !important; }
 div.embeddedAppMetaInfoBar_container__DxxL1 { display: none !important; }
@@ -242,35 +245,13 @@ if selected_display:
 
         with col_left:
             st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
-            # Radar chart
-            labels = AXES_LABELS
-            values = [axes.get(a, 0) for a in labels]
-            values_closed = values + [values[0]]
-            labels_closed = labels + [labels[0]]
 
-            fig = go.Figure()
-            fig.add_trace(go.Scatterpolar(
-                r=values_closed,
-                theta=labels_closed,
-                fill='toself',
-                fillcolor='rgba(46, 123, 230, 0.1)',
-                line_color='#2E7BE6',
-                line=dict(width=4),
-                name=selected_name,
-            ))
-            fig.update_layout(
-                polar=dict(
-                    radialaxis=dict(visible=True, range=[0, 200], gridcolor="#F0F0F0"),
-                    angularaxis=dict(rotation=90, direction="clockwise"),
-                    bgcolor='white',
-                ),
-                showlegend=False,
-                margin=dict(l=50, r=50, t=20, b=20),
-                height=500,
-                clickmode='none',
-                dragmode=False,
+            fig_r = render_radar_chart(
+                {"axes": axes, "name": selected_name},
+                None,
+                AXES_LABELS,
             )
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_r, use_container_width=True)
 
         with col_right:
             st.markdown("<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>II. ANALYSIS SCORE METRICS</div>", unsafe_allow_html=True)
