@@ -25,7 +25,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install pandas
+        run: pip install pandas numpy requests
 
       - name: Record scores
         run: python record_scores.py

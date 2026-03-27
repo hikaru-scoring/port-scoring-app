@@ -9,8 +9,6 @@ import os
 
 from data_logic import (
     AXES_LABELS,
-    PORTS_DATA,
-    load_all_ports,
     get_port_rankings,
     get_port_detail,
     get_raw_data,
@@ -100,15 +98,23 @@ st.markdown("""
 # Main Page
 # ---------------------------------------------------------------------------
 st.markdown('<div class="main-title">\u2693 PORT-1000: Global Port Scoring</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Scoring 50+ major ports worldwide on Throughput, Efficiency, Connectivity, Infrastructure, and Geopolitical Risk</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="sub-title">'
+    "Scoring 50+ major ports worldwide on Throughput, Efficiency, "
+    "Connectivity, Infrastructure, and Geopolitical Risk. "
+    "Country-level data from World Bank API. Port-level data curated from "
+    "UNCTAD, port authority reports, and Lloyd's List."
+    "</div>",
+    unsafe_allow_html=True,
+)
 
 rankings = get_port_rankings()
 
 # Summary stats
 total_ports = len(rankings)
-avg_score = int(sum(p["total"] for p in rankings) / total_ports)
-top_port = rankings[0]
-bottom_port = rankings[-1]
+avg_score = int(sum(p["total"] for p in rankings) / total_ports) if total_ports else 0
+top_port = rankings[0] if rankings else {}
+bottom_port = rankings[-1] if rankings else {}
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
@@ -116,9 +122,17 @@ with col1:
 with col2:
     st.markdown(f'<div class="metric-card"><h3>{avg_score}</h3><p>Average Score /1000</p></div>', unsafe_allow_html=True)
 with col3:
-    st.markdown(f'<div class="metric-card"><h3>{top_port["flag"]} {top_port["name"]}</h3><p>Top Port ({top_port["total"]}/1000)</p></div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="metric-card"><h3>{top_port.get("flag", "")} {top_port.get("name", "")}</h3>'
+        f'<p>Top Port ({top_port.get("total", 0)}/1000)</p></div>',
+        unsafe_allow_html=True,
+    )
 with col4:
-    st.markdown(f'<div class="metric-card"><h3>{bottom_port["flag"]} {bottom_port["name"]}</h3><p>Bottom Port ({bottom_port["total"]}/1000)</p></div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="metric-card"><h3>{bottom_port.get("flag", "")} {bottom_port.get("name", "")}</h3>'
+        f'<p>Bottom Port ({bottom_port.get("total", 0)}/1000)</p></div>',
+        unsafe_allow_html=True,
+    )
 
 st.markdown("---")
 
@@ -313,36 +327,23 @@ if selected_display:
 
         # Key Metrics
         st.markdown("#### Key Metrics")
-        m1, m2, m3, m4 = st.columns(4)
+        m1, m2, m3 = st.columns(3)
         with m1:
-            st.metric("Annual TEU", f'{raw.get("teu_million", "N/A")}M')
-            st.metric("TEU Growth", f'{raw.get("teu_growth_pct", "N/A")}%')
+            st.metric("Annual TEU (2023)", f'{raw.get("teu_million", "N/A")}M')
+            st.metric("TEU Growth YoY", f'{raw.get("teu_growth_pct", "N/A")}%')
         with m2:
             st.metric("Cargo Volume", f'{raw.get("cargo_mt", "N/A")} MT')
-            st.metric("Turnaround", f'{raw.get("turnaround_hours", "N/A")} hrs')
-        with m3:
-            st.metric("Direct Routes", raw.get("direct_routes", "N/A"))
-            st.metric("Countries Connected", raw.get("countries_connected", "N/A"))
-        with m4:
             st.metric("Max Draft", f'{raw.get("max_draft_m", "N/A")} m')
-            st.metric("LSCI Index", raw.get("lsci", "N/A"))
+        with m3:
+            st.metric("Berth Length", f'{raw.get("berth_length_m", "N/A")} m')
+            st.metric("Number of Berths", raw.get("num_berths", "N/A"))
 
-        # Historical context / notes
-        st.markdown("#### Notes")
-        notes = {
-            "Singapore": "World's busiest transshipment hub. Consistently ranked as the top maritime capital. The Tuas mega-port expansion will consolidate all operations by 2040, adding 65M TEU capacity.",
-            "Shanghai": "World's largest container port by TEU volume since 2010. The Yangshan deep-water port is fully automated. Key gateway for Chinese exports.",
-            "Ningbo-Zhoushan": "Largest port by total cargo tonnage globally. Rapid growth driven by bulk commodity imports. Expanding automation across all terminals.",
-            "Shenzhen": "Major export hub for the Pearl River Delta manufacturing region. Comprises Yantian, Chiwan, and Shekou terminals.",
-            "Rotterdam": "Europe's largest port. Gateway to the European hinterland via Rhine river. Major investments in digitalization and energy transition.",
-            "Dubai (Jebel Ali)": "Largest port in the Middle East. Operated by DP World. Key transshipment hub connecting Asia, Europe, and Africa.",
-            "Busan": "South Korea's principal port and major transshipment hub for Northeast Asia. New port expansion ongoing.",
-            "Tangier Med": "Africa's largest container port. Strategic location at the Strait of Gibraltar. Fastest-growing port globally in recent years.",
-            "Bandar Abbas": "Iran's largest port, heavily affected by international sanctions. Limited connectivity due to trade restrictions.",
-            "Novorossiysk": "Russia's largest port on the Black Sea. Severely impacted by sanctions following the conflict in Ukraine. Declining container volumes.",
-        }
-        note = notes.get(selected_name, f"{selected_name} is one of the world's major ports, handling significant container and cargo volumes for its region.")
-        st.info(note)
+        # Data source
+        st.markdown("#### Data Source")
+        st.info(f'Port-level data source: {raw.get("source", "N/A")}. '
+                f'Country-level indicators from World Bank Open Data API '
+                f'(Political Stability PV.EST, Logistics Performance Index LP.LPI.*, '
+                f'Trade Openness TG.VAL.TOTL.GD.ZS).')
 
 
 # ---------------------------------------------------------------------------
@@ -387,4 +388,8 @@ else:
     st.caption("No daily score records yet. Records will appear after the GitHub Actions workflow runs.")
 
 st.markdown("---")
-st.caption("PORT-1000 v1.0. Data is based on publicly available port statistics and indices. Scores update daily via automated recording.")
+st.caption(
+    "PORT-1000 v2.0. Port-level data curated from UNCTAD, port authority annual reports, "
+    "and Lloyd's List (2023). Country-level data from World Bank Open Data API. "
+    "Scores update daily via automated recording."
+)
