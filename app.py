@@ -534,7 +534,7 @@ with tab_rankings:
         flag = p.get("flag", "")
         country = p.get("country", "")
         score = p["total"]
-        badge_color = "#0077B6"
+        badge_color = "#2E7BE6"
 
         # Score color
         if score >= 800:
