@@ -521,25 +521,60 @@ with tab_detail:
 with tab_rankings:
     st.markdown("#### Full Rankings")
 
-    table_rows = []
-    for p in rankings:
-        row = {
-            "Rank": p["rank"],
-            "Port": f'{p["flag"]} {p["name"]}',
-            "Country": p["country"],
-            "Total /1000": p["total"],
-        }
-        for axis in AXES_LABELS:
-            row[f"{axis} /200"] = p["axes"].get(axis, 0)
-        table_rows.append(row)
+    sorted_ports = sorted(rankings, key=lambda x: x["total"], reverse=True)
+    history = _load_scores_history()
+    prev_scores = {}
+    if history:
+        dates = sorted(history.keys(), reverse=True)
+        if dates:
+            prev_scores = history[dates[0]]
 
-    df_table = pd.DataFrame(table_rows)
-    st.dataframe(
-        df_table,
-        use_container_width=True,
-        hide_index=True,
-        height=450,
-    )
+    for i, p in enumerate(sorted_ports, 1):
+        name = p["name"]
+        flag = p.get("flag", "")
+        country = p.get("country", "")
+        score = p["total"]
+        badge_color = "#0077B6"
+
+        # Score color
+        if score >= 800:
+            bar_color = "#10b981"
+        elif score >= 600:
+            bar_color = "#2E7BE6"
+        elif score >= 400:
+            bar_color = "#f59e0b"
+        else:
+            bar_color = "#ef4444"
+
+        # Change indicator
+        prev = prev_scores.get(name)
+        if prev is not None:
+            delta = score - prev
+            if delta > 0:
+                change_html = f'<span style="font-size:0.8em; font-weight:700; color:#10b981;">&#9650; +{delta}</span>'
+            elif delta < 0:
+                change_html = f'<span style="font-size:0.8em; font-weight:700; color:#ef4444;">&#9660; {delta}</span>'
+            else:
+                change_html = '<span style="font-size:0.8em; font-weight:700; color:#94a3b8;">&#9644; 0</span>'
+        else:
+            change_html = ""
+
+        st.markdown(f"""
+<div style="display:flex; align-items:center; padding:14px 20px; background:#fff; border-radius:12px; margin-bottom:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+    <div style="font-size:1.4em; font-weight:900; color:#94a3b8; width:40px;">#{i}</div>
+    <div style="flex:1;">
+        <div style="font-size:1.05em; font-weight:700; color:#1e293b;">{flag} {name}</div>
+        <span style="font-size:0.75em; background:{badge_color}; color:#fff; padding:2px 8px; border-radius:20px;">{country}</span>
+        {change_html}
+    </div>
+    <div style="text-align:right; min-width:80px;">
+        <div style="font-size:1.5em; font-weight:900; color:{bar_color};">{score}</div>
+        <div style="background:#f1f5f9; border-radius:4px; height:6px; width:80px; margin-top:4px;">
+            <div style="background:{bar_color}; height:6px; border-radius:4px; width:{score/10}%;"></div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
     with st.expander("Scoring Methodology"):
         st.markdown("### PORT-1000 Scoring System")
