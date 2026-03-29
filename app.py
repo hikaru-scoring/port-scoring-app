@@ -125,17 +125,6 @@ def render_score_delta(asset_name: str, current_total: int):
     )
 
 
-# ---------------------------------------------------------------------------
-# Header
-# ---------------------------------------------------------------------------
-st.markdown(f"""
-<div style="text-align:center; margin-bottom:10px;">
-    <div style="font-size:38px; font-weight:900; color:{PRIMARY_COLOR};">\u2693 PORT-1000</div>
-    <div style="font-size:16px; color:#64748B; margin-top:-4px;">Global Port Scoring</div>
-    <div style="font-size:13px; color:#999; margin-top:2px;">Scoring 50+ major ports worldwide on Throughput, Efficiency, Connectivity, Infrastructure, and Geopolitical Risk.</div>
-</div>
-""", unsafe_allow_html=True)
-
 rankings = get_port_rankings()
 
 if not rankings:
@@ -322,10 +311,11 @@ with tab_detail:
             pass
 
     port_names = [f'{p["flag"]} {p["name"]}' for p in rankings]
+    port_lookup = {f'{p["flag"]} {p["name"]}': p["name"] for p in rankings}
     selected_display = st.selectbox("Select a port to view details", port_names, key="port_detail_select")
 
     if selected_display:
-        selected_name = selected_display.split(" ", 1)[1] if " " in selected_display else selected_display
+        selected_name = port_lookup.get(selected_display, selected_display)
         detail = get_port_detail(selected_name)
         raw = get_raw_data(selected_name)
 
