@@ -473,7 +473,7 @@ with tab_detail:
                     st.markdown(f"""
                     <div style="background:#f8fafc; border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0;">
                         <div style="font-size:0.75em; color:#64748b; font-weight:600;">{label}</div>
-                        <div style="font-size:1.5em; font-weight:900; color:#1e293b; line-height:1.2;">{val}</div>
+                        <div style="font-size:1.5em; font-weight:900; color:#2E7BE6; line-height:1.2;">{val}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
