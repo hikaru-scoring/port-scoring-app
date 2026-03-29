@@ -282,7 +282,7 @@ with tab_detail:
         lat=[p["lat"] for p in rankings],
         lon=[p["lng"] for p in rankings],
         text=[f'{p["flag"]} {p["name"]} ({p["country"]})\nScore: {p["total"]}' for p in rankings],
-        mode="markers+text",
+        mode="markers",
         marker=dict(
             size=[max(8, p["total"] / 50) for p in rankings],
             color=[p["total"] for p in rankings],
@@ -291,8 +291,6 @@ with tab_detail:
             colorbar=dict(title="Score", thickness=15, len=0.6),
             line=dict(width=1, color="#333"),
         ),
-        textfont=dict(size=8, color="#1e293b"),
-        textposition="top center",
         hoverinfo="text",
     ))
     fig_map.update_layout(
