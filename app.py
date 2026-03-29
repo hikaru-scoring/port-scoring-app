@@ -402,13 +402,71 @@ with tab_detail:
                     </div>
                     """, unsafe_allow_html=True)
                     with st.expander(f"Why {int(ax_val)}?", expanded=False):
-                        st.markdown(WHY_EXPLANATIONS.get(ax_name, ""))
+                        if ax_name == "Throughput Power":
+                            st.markdown(f"""
+**Formula:** `Percentile rank of TEU volume + tonnage + growth rate`
+
+**Raw Data:** TEU: {raw.get('teu_million', 'N/A')}M | Growth: {raw.get('teu_growth_pct', 'N/A')}% | Cargo: {raw.get('cargo_mt', 'N/A')} MT
+
+**Source:** UNCTAD, Lloyd's List, Port Authority Reports
+                            """)
+                        elif ax_name == "Operational Efficiency":
+                            st.markdown("""
+**Formula:** `Country-level LPI score + Customs efficiency (World Bank)`
+
+**Source:** World Bank Logistics Performance Index (LPI)
+                            """)
+                        elif ax_name == "Connectivity":
+                            st.markdown("""
+**Formula:** `Trade openness (Trade/GDP) + Tracking capability (LPI)`
+
+**Source:** World Bank Trade & LPI Indicators
+                            """)
+                        elif ax_name == "Infrastructure":
+                            st.markdown(f"""
+**Formula:** `Percentile of berth length + max draft + berth count + LPI infra`
+
+**Raw Data:** Berths: {raw.get('num_berths', 'N/A')} | Max Draft: {raw.get('max_draft_m', 'N/A')}m | Berth Length: {raw.get('berth_length_m', 'N/A')}m
+
+**Source:** Port Authority Reports, World Bank LPI Infrastructure
+                            """)
+                        elif ax_name == "Geopolitical Risk":
+                            st.markdown("""
+**Formula:** `Political Stability Index (World Bank WGI), inverted: higher stability = higher score`
+
+**Source:** World Bank Worldwide Governance Indicators (WGI)
+                            """)
 
             # Key Metrics (snapshot style)
             st.markdown(
                 "<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: 10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>III. KEY METRICS SNAPSHOT</div>",
                 unsafe_allow_html=True,
             )
+
+            # TOTAL / STRONGEST / WEAKEST summary row
+            sc1, sc2, sc3 = st.columns(3)
+            _best_ax = max(axes, key=axes.get) if axes else "N/A"
+            _best_val = int(axes.get(_best_ax, 0))
+            _worst_ax = min(axes, key=axes.get) if axes else "N/A"
+            _worst_val = int(axes.get(_worst_ax, 0))
+            sc1.markdown(f"""
+            <div style="background:#f8fafc; border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid #e2e8f0;">
+                <div style="font-size:0.75em; color:#64748b; font-weight:600;">TOTAL SCORE</div>
+                <div style="font-size:1.5em; font-weight:900; color:#1e293b; line-height:1.2;">{total} <span style="font-size:0.5em; color:#999;">/1000</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            sc2.markdown(f"""
+            <div style="background:#f0fdf4; border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid #bbf7d0;">
+                <div style="font-size:0.75em; color:#64748b; font-weight:600;">STRONGEST</div>
+                <div style="font-size:1.5em; font-weight:900; color:#10b981; line-height:1.2;">{_best_ax} ({_best_val})</div>
+            </div>
+            """, unsafe_allow_html=True)
+            sc3.markdown(f"""
+            <div style="background:#fef2f2; border-radius:10px; padding:14px; margin-bottom:10px; border:1px solid #fecaca;">
+                <div style="font-size:0.75em; color:#64748b; font-weight:600;">WEAKEST</div>
+                <div style="font-size:1.5em; font-weight:900; color:#ef4444; line-height:1.2;">{_worst_ax} ({_worst_val})</div>
+            </div>
+            """, unsafe_allow_html=True)
 
             snapshot_items = [
                 ("Annual TEU (2023)", f'{raw.get("teu_million", "N/A")}M'),
