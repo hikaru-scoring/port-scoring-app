@@ -304,9 +304,11 @@ with tab_detail:
         try:
             _points = _map_event.selection.points
             if _points:
-                _idx = _points[0].get("pointIndex", None)
+                _idx = _points[0].get("pointIndex") or _points[0].get("point_index") or _points[0].get("pointNumber")
                 if _idx is not None and _idx < len(rankings):
-                    st.session_state["port_detail_select"] = f'{rankings[_idx]["flag"]} {rankings[_idx]["name"]}'
+                    _selected_port = rankings[_idx]
+                    _display_key = f'{_selected_port["flag"]} {_selected_port["name"]}'
+                    st.session_state["port_detail_select"] = _display_key
         except Exception:
             pass
 
